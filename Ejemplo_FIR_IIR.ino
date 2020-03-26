@@ -1,4 +1,5 @@
 #include"funciones.h"
+#include <avr/interrupt.h>
 /*Instrucciones de las siguientes 3 lineas:
 1. Cambie MEDIRTIEMPOS a 1 o 0 para sacar en 2 columna el tiempo de funcion en microsegundos
 2. Cambie entrada a {RUIDO,PASO,IMPULSO} para simular una señal de entrada
@@ -8,20 +9,35 @@
 #define MEDIRTIEMPOS 0//Cambiar a 1 y abrir el monitor serial "de la grafica no se aprecia mucho ya que la columna del centro está en microsegundos"
 #define MOSTRARENTRADA 1// cambiar a 1 para mostrar la entrada
 #define MUESTRASPASOIMPULSO 100// numero de muestras antes de resetear la respuesta paso e impulso, subir en sistemas lentos
-int entrada=IMPULSO;// Seleccione PASO, RUIDO, IMPULSO
-int salida=FIR1;// Seleccione FIR1,FIR2,FIR3, o IIR
+int entrada=SIN;// Seleccione PASO, RUIDO, IMPULSO
+int f=20;      //frecuencia de la onda seno 5, 10, 20
+int salida=FIR3;// Seleccione FIR1,FIR2,FIR3, o IIR
 const long interval = 10;           // Intervalo a medir periodico en milisegundos 100Hs=10ms
-void setup() {
-  // put your setup code here, to run once:
-Inicializar_ADC_PWM_Serial();
-previousMillis=0;
+
+
+ISR(ADC_vect)
+{
+ banderaADC=0xFF;
 }
 
+
+void setup() {
+ sei();
+Inicializar_ADC_PWM_Serial();
+previousMillis=0;
+tam=(200/f);
+Serial.begin(9600);
+}
 
 void loop() {
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
+    inicieConv();
+  }
+  
+  if (banderaADC) {
     previousMillis = currentMillis;
+    leerConv();
     long sal;// para los FIR cambiar sal a long
     float saliir;
     switch(entrada)
@@ -57,6 +73,20 @@ void loop() {
           }
           cont++;
           break; 
+
+         case SIN:
+         walk=seno5[cont];
+         if(f==10)
+         walk=seno10[cont];
+         if(f==20)
+         walk=seno20[cont];
+         cont++;
+         if (cont>=tam)
+         {
+         cont=0;
+         }
+         break;
+          
        default: 
           Serial.println("no selecciono entrada");
           walk=-1; 
@@ -118,5 +148,5 @@ void loop() {
     }
     Serial.println("");
 }
-  delay(10);//delay de 10 ms para que haga alrededor de 100 muestras por segundo
+  delay(255);//delay de 10 ms para que haga alrededor de 100 muestras por segundo
 }
